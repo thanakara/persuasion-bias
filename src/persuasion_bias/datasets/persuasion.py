@@ -1,12 +1,11 @@
+import pandas as pd
 from datasets import load_dataset
 from langchain_core.document_loaders.base import BaseLoader
 from langchain_core.documents import Document
 
 
 class PersuasionDatasetLoader(BaseLoader):
-    """-----------------------------------------------------------+
-    |Custom LangChain loader for the Anthropic Persuasion Dataset |
-    +-----------------------------------------------------------"""
+    """Custom LangChain loader for the Anthropic Persuasion Dataset"""
 
     repo_id: str = "Anthropic/persuasion"
 
@@ -14,32 +13,31 @@ class PersuasionDatasetLoader(BaseLoader):
         """Load from HuggingFace and convert into LangChain Documents"""
 
         dataset = load_dataset(self.repo_id)
-        df = dataset["train"].to_pandas()
-        df["rating_initial"] = df["rating_initial"].apply(lambda x: eval(x[0]))
-        df["rating_final"] = df["rating_final"].apply(lambda x: eval(x[0]))
-        #
+        frame = dataset["train"].to_pandas()
+        frame = self._deduplicate_frame_by_argument(frame=frame)
+
         documents = []
-        for idx, row in enumerate(df.itertuples()):
+        for row in frame.itertuples():
+            persuasiveness_delta = row.rating_final - row.rating_initial
             metadata = {
-                "id": idx,
                 "source": row.source,
                 "prompt_type": row.prompt_type,
                 "rating_initial": row.rating_initial,
                 "rating_final": row.rating_final,
-                "persuasiveness_delta": row.rating_final - row.rating_initial,
+                "persuasiveness_delta": persuasiveness_delta,
                 "claim": row.claim,
                 "argument": row.argument,
                 "is_human": row.source == "Human",
-                "is_persuasive": ((row.rating_final - row.rating_initial) > 0),
+                "is_persuasive": persuasiveness_delta > 0,
             }
 
             page_content = (
                 f"Claim: {row.claim}\n"
                 f"Argument: {row.argument}\n"
                 f"Source: {row.source}\n"
-                f"Persuasiveness Change: {row.rating_final - row.rating_initial}\n"
                 f"Initial Rating: {row.rating_initial}\n"
-                f"Final Rating: {row.rating_final}"
+                f"Final Rating: {row.rating_final}\n"
+                f"Persuasiveness Change: {row.rating_final - row.rating_initial}"
             )
 
             document = Document(page_content=page_content, metadata=metadata)
@@ -47,20 +45,13 @@ class PersuasionDatasetLoader(BaseLoader):
 
         return documents
 
-    # def _deduplicate_documents_by_claim_argument(
-    #     self,
-    #     documents: list[Document],
-    # ) -> list[Document]:
-    #     seen = set()
-    #     unique_docs = []
+    def _deduplicate_frame_by_argument(
+        self,
+        frame: pd.DataFrame,
+    ) -> pd.DataFrame:
+        for column in ("rating_initial", "rating_final"):
+            frame[column] = frame[column].apply(lambda e: eval(e[0]))
 
-    #     for doc in documents:
-    #         claim = doc.metadata.get("claim", "").strip()
-    #         argument = doc.metadata.get("argument", "").strip()
-    #         key = (claim, argument)
-
-    #         if key not in seen:
-    #             seen.add(key)
-    #             unique_docs.append(doc)
-
-    #     return unique_docs
+        frame.prompt_type = frame.prompt_type.fillna("Other")
+        idx_unique = frame.argument.drop_duplicates().index
+        return frame.iloc[idx_unique]
