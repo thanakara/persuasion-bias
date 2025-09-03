@@ -5,7 +5,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 
 def documents_reader_helper(documents: list[Document]) -> str:
-    """Wraps over retrieval_tool function. It simply joins with newlines the documents."""
+    """Wraps over retrieval_tool function. Simply joins with newlines the documents."""
 
     result = []
     for document in documents:
@@ -15,7 +15,7 @@ def documents_reader_helper(documents: list[Document]) -> str:
 
 
 def get_llama_response_content(agent: CompiledStateGraph, argument: str) -> None:
-    """Prettifier display on the markdown LLM response."""
+    """Prettifier; display on the Markdown LLM response."""
 
     human_message = HumanMessage(argument)
     response = agent.invoke({"messages": [human_message]})

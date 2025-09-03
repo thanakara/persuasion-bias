@@ -30,7 +30,8 @@ class BaselinePersuasionRAG:
 
         return flow.compile()
 
-    def should_make_retrieval(self, state: BaselineState) -> bool:
+    @staticmethod
+    def should_make_retrieval(state: BaselineState) -> bool:
         """Decides whether to retrieve documents or END. Returns boolean."""
 
         *_, last_message = state.get("messages")
@@ -67,7 +68,7 @@ class BaselinePersuasionRAG:
                     "Incorrect Tool Name. Please Retry and Select from Available Tools."
                 )
 
-            # Llama3.2 models after invocation sometimes return nested dictioanaries
+            # Llama3.2 models after invocation sometimes return nested dictionaries
             try:
                 assert "properties" in t.get("args")
                 result = self.tools_dict.get(t.get("name"))(
