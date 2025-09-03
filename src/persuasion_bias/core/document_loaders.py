@@ -45,10 +45,8 @@ class PersuasionDatasetLoader(BaseLoader):
 
         return documents
 
-    def _deduplicate_frame_by_argument(
-        self,
-        frame: pd.DataFrame,
-    ) -> pd.DataFrame:
+    @staticmethod
+    def _deduplicate_frame_by_argument(frame: pd.DataFrame) -> pd.DataFrame:
         for column in ("rating_initial", "rating_final"):
             frame[column] = frame[column].apply(lambda e: eval(e[0]))
 
