@@ -8,7 +8,10 @@ from pydantic import Field
 
 
 class PersuasivenessRetriever(BaseRetriever):
-    """Custom retriever that can filter by persuasiveness and source"""
+    """
+    Custom retriever that can filter by persuasiveness and source.
+    Similar to .as_retriever() method using the MMR algorithm.
+    """
 
     # BaseRetriever uses Pydantic
     vectorstore: Chroma = Field(...)
