@@ -9,6 +9,14 @@ RAG_PROMPT = """\
     Documents: {documents}
     """
 
+IS_ARGUMENT_TEMPLATE = """\
+        You are an expert in argumentation. Decide if the user's question
+        is an argument or not. If yes, return True. If not, return False.
+        Return nothing else.
+        
+        Question: {query}
+        """
+
 
 RAG_SYSTEM_MESSAGE = """\
     You are an expert in bias detection. Given a user's argument
@@ -52,6 +60,7 @@ ANALYSIS_PROMPT = """\
     - Who is being targeted and how
 
     Provide your analysis in the following JSON format:
+    
     {{
         "cialdini_principles": [
             {{
@@ -67,4 +76,7 @@ ANALYSIS_PROMPT = """\
         "target_audience_analysis": "description of targeting strategy",
         "overall_bias_score": 0.0-1.0
     }}
+
+    DO NOT use extra lines on the JSON.
+    Follow the format above and NOTHING MORE.
     """

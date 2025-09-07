@@ -1,11 +1,10 @@
 import operator
+from typing import Annotated, TypedDict
 
-from langgraph.graph.message import add_messages
-from typing import Annotated, TypedDict, Sequence
+from langchain_core.messages import BaseMessage
+from langgraph.graph import MessagesState
 
-from langchain_core.messages import BaseMessage, AnyMessage
 from persuasion_bias.utils.outputs import BiasAnalysis
-
 
 
 # Baseline state for simple RAG
@@ -13,7 +12,9 @@ class BaselineState(TypedDict):
     messages: Annotated[list[BaseMessage], operator.add]
 
 
-# Analysis state
-class BiasAnalysisState(TypedDict):
-    messages: Annotated[Sequence[AnyMessage], add_messages]
-    # analysis: BiasAnalysis
+# State for Bias analysis
+class AnalysisState(MessagesState):
+    query: str
+    is_argument: bool
+    retrieval: str
+    analysis: BiasAnalysis
