@@ -10,10 +10,12 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnableBinding
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
+from pydantic import ValidationError
 
 from persuasion_bias.core.document_loaders import PersuasionDatasetLoader
 from persuasion_bias.core.retrievers import PersuasivenessRetriever
 from persuasion_bias.core.state import AnalysisState, BaselineState
+from persuasion_bias.utils.outputs import BiasAnalysis
 from persuasion_bias.utils.prompts import (
     ANALYSIS_PROMPT,
     IS_ARGUMENT_TEMPLATE,
@@ -98,6 +100,7 @@ class BiasAnalystAgent:
         self.llm = llm
         self.embedding = embedding
         self.vectorstore = vectorstore
+        self._retriever = None
 
     def _graph_fabricate(self) -> CompiledStateGraph:
         """Builds the LangGraph workflow."""
@@ -128,11 +131,14 @@ class BiasAnalystAgent:
     def _get_core_retriever(self) -> PersuasivenessRetriever:
         """Custom retriever using MMR algorithm."""
 
-        documents = self._load_documents_from_hub()
-        vectorstore = self.vectorstore.from_documents(
-            documents=documents, embedding=self.embedding
-        )
-        return PersuasivenessRetriever(vectorstore=vectorstore)
+        if self._retriever is None:
+            documents = self._load_documents_from_hub()
+            vectorstore = self.vectorstore.from_documents(
+                documents=documents, embedding=self.embedding
+            )
+            self._retriever = PersuasivenessRetriever(vectorstore=vectorstore)
+
+        return self._retriever
 
     def is_argument_node(self, state: AnalysisState) -> AnalysisState:
         """Decides whether to retrieve OR end."""
@@ -141,17 +147,19 @@ class BiasAnalystAgent:
         prompt = PromptTemplate.from_template(template=IS_ARGUMENT_TEMPLATE)
         response = self.llm.invoke(prompt.format(query=query))
 
-        return {"is_argument": eval(response.content)}
+        response_text = response.content.strip().lower()
+        is_argument = response_text in ["true", "1", "yes"] or response_text.startswith(
+            "true"
+        )
+        return {"is_argument": is_argument}
 
     @staticmethod
     def should_continue(state: AnalysisState) -> str:
         """Conditional edge"""
 
         is_argument = state.get("is_argument")
-        if is_argument:
-            return "true"
-        else:
-            return "false"
+
+        return "true" if is_argument else "false"
 
     def retriever_node(self, state: AnalysisState) -> AnalysisState:
         """Updates the state with the retrieval."""
@@ -167,14 +175,13 @@ class BiasAnalystAgent:
         }
 
     def bias_analyzer_node(self, state: AnalysisState) -> AnalysisState:
-        """Analyzes the bias of the argument in JSON."""
+        """Analyzes the bias of the argument."""
 
         query = state.get("query")
         context = state.get("retrieval")
         prompt = PromptTemplate.from_template(template=ANALYSIS_PROMPT)
 
         response = self.llm.invoke(prompt.format(query=query, context=context))
-
         ai_message = AIMessage("Bias analysis completed.")
 
         try:
