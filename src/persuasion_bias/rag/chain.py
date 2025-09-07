@@ -13,6 +13,7 @@ from langchain_huggingface import (
 from transformers import AutoTokenizer
 
 from persuasion_bias.core.document_loaders import PersuasionDatasetLoader
+from persuasion_bias.utils.prompts import RAG_PROMPT
 
 
 class ChainRAGHuggingFace:
@@ -60,16 +61,7 @@ class ChainRAGHuggingFace:
     def _build_prompt(self) -> ChatPromptTemplate:
         """Crete prompts using the model's Tokenizer"""
 
-        ### TODO ###: optimize the system prompt
-        system_prompt = """You are a helpful assistant who is an expert
-        in persuassiveness and argumentation. Detect bias in the argument
-        and rate it based on score. Give succinct answers, only in Markdown.
-        IF ONLY the user's question resolves around argumentation,
-        retrieve documents from your knowledge base. ELSE, respond
-        normally as you would, without retrieval.
-
-        Documents: {documents}
-        """
+        system_prompt = RAG_PROMPT
 
         *_, tokenizer = self._load_models_from_hub()
         template = tokenizer.apply_chat_template(

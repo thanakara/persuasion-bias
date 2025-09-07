@@ -6,6 +6,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from persuasion_bias.core.state import BaselineState
+from persuasion_bias.utils.prompts import RAG_SYSTEM_MESSAGE
 
 
 class BaselinePersuasionRAG:
@@ -42,13 +43,7 @@ class BaselinePersuasionRAG:
         """Invokes the LLM to get a response, adding it to the state."""
 
         messages = state.get("messages")
-        content = """You are a helpful assistant who is expert in
-        persuasiveness and argumentation. Use the `retriever_tool` to
-        provide relevant information. If you don't have any relevant
-        information, just respond normally as you would.
-        Please give the user succinct answers. If you don't know the
-        answer, simply say so. Respond only in Markdown format.
-        """
+        content = RAG_SYSTEM_MESSAGE
         system_message = SystemMessage(content=content)
         messages_add = [system_message] + messages
         response = self.llm.invoke(messages_add)
