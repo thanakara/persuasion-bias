@@ -1,7 +1,13 @@
 import json
 from typing import Callable
 
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain.retrievers.document_compressors import (
+    DocumentCompressorPipeline,
+    EmbeddingsFilter,
+)
 from langchain.vectorstores import VectorStore
+from langchain_community.document_transformers import EmbeddingsRedundantFilter
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
@@ -126,15 +132,33 @@ class BiasAnalystAgent:
 
         return loader.load_from_huggingface()
 
-    def _get_core_retriever(self) -> PersuasivenessRetriever:
-        """Custom retriever using MMR algorithm."""
+    def _get_core_retriever(
+        self, similarity_threshold: float = 0.55
+    ) -> ContextualCompressionRetriever:
+        """
+        Contextual Compression Retriever using:
+            * base_retriever=PersuasivenessRetriever [Custom: `MMR` algorithm]
+            * base_compressor=DocumentCompressorPipeline [redundancy -> relevance]
+        """
 
         if self._retriever is None:
             documents = self._load_documents_from_hub()
             vectorstore = self.vectorstore.from_documents(
                 documents=documents, embedding=self.embedding
             )
-            self._retriever = PersuasivenessRetriever(vectorstore=vectorstore)
+            vectorstore_retriever = PersuasivenessRetriever(vectorstore=vectorstore)
+            redundant_filter = EmbeddingsRedundantFilter(embeddings=self.embedding)
+            relevance_filter = EmbeddingsFilter(
+                embeddings=self.embedding, similarity_threshold=similarity_threshold
+            )
+            compression_pipeline = DocumentCompressorPipeline(
+                transformers=[redundant_filter, relevance_filter]
+            )
+            compression_retriever = ContextualCompressionRetriever(
+                base_compressor=compression_pipeline,
+                base_retriever=vectorstore_retriever,
+            )
+            self._retriever = compression_retriever
 
         return self._retriever
 
