@@ -10,12 +10,10 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnableBinding
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
-from pydantic import ValidationError
 
 from persuasion_bias.core.document_loaders import PersuasionDatasetLoader
 from persuasion_bias.core.retrievers import PersuasivenessRetriever
 from persuasion_bias.core.state import AnalysisState, BaselineState
-from persuasion_bias.utils.outputs import BiasAnalysis
 from persuasion_bias.utils.prompts import (
     ANALYSIS_PROMPT,
     IS_ARGUMENT_TEMPLATE,
