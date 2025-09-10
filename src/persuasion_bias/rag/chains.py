@@ -149,28 +149,35 @@ class CompressionRAGChain:
 
     def __init__(
         self,
+        log: logging.Logger,
         repo_id: str | None = None,
         vectorstore: VectorStore = Chroma,
         use_anthropic: bool = False,
         documents: List[Document] = [],
         retriever: VectorStoreRetriever = None,
     ) -> None:
+        self.log = log
+
         if repo_id and use_anthropic:
-            raise ValueError("You cannot set both `repo_id` and `use_anthropic=True`.")
+            error_msg = "You cannot set both `repo_id` and `use_anthropic=True`."
+            self.log.error(error_msg)
+            raise ValueError(error_msg)
 
         if repo_id:
             use_anthropic = False
+            self.log.info(f"Using HuggingFace model: {repo_id}")
             llm = HuggingFaceEndpoint(repo_id=repo_id, temperature=0.1)
             self.model = ChatHuggingFace(llm=llm)
 
         elif use_anthropic:
             model_name = "claude-3-5-haiku-20241022"
+            self.log.info(f"Using Anthropic model: {model_name}")
             self.model = ChatAnthropic(temperature=0.1, model_name=model_name)
 
         else:
-            raise ValueError(
-                "You must specify either `repo_id` or set `use_anthropic`."
-            )
+            error_msg = "You must specify either `repo_id` or set `use_anthropic`."
+            self.log.error(error_msg)
+            raise ValueError(error_msg)
 
         self.vectorstore = vectorstore
         self._documents = documents
@@ -204,15 +211,21 @@ class CompressionRAGChain:
         """Creates a contextual compression retriever and caches it."""
 
         if self._retriever is None:
+            self.log.info("Creating contextual compression retriever")
+
+            self.log.debug("Loading documents")
             embedding = self._load_sentence_transformers_embeddings()
             documents = self._load_documents_from_hub()
+            self.log.debug("Creating vectorstore")
             vectorstore = self.vectorstore.from_documents(
                 documents=documents, embedding=embedding
             )
+            self.log.debug("Setting up vectorstore retriever")
             vectorstore_retriever = vectorstore.as_retriever(
                 search_type="mmr", search_kwargs={"k": 5}
             )
 
+            self.log.debug("Setting up the compression pipeline")
             redundant_filter = EmbeddingsRedundantFilter(embeddings=embedding)
             relevance_filter = EmbeddingsFilter(
                 embeddings=embedding, similarity_threshold=similarity_threshold
@@ -225,6 +238,7 @@ class CompressionRAGChain:
                 base_retriever=vectorstore_retriever,
             )
             self._retriever = compression_retriever
+            self.log.info("Retriever created and cached")
 
         return self._retriever
 
