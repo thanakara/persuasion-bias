@@ -1,20 +1,29 @@
 version: 1
-disable_existing_loggers: False
+disable_existing_loggers: false
 
 formatters:
   simple:
     format: "[%(levelname)s]: %(message)s"
-  error-simple:
+  error-prone:
     format : "%(asctime)s - %(name)s - %(lineno)d [%(levelname)s]: %(message)s"
 
 handlers:
   console:
     class: logging.StreamHandler
+    level: INFO
     formatter: simple
     stream: ext://sys.stdout
+  # file:
+  #   class: logging.FileHandler
+  #   level: DEBUG
+  #   formatter: error-prone
+  #   filename: src/persuasion_bias/logs/session.log
+  #   mode: a
 
 loggers:
-  root:
-    level: INFO # /DEBUG
-    handlers:
-      - console
+  root: # use: name=__name__
+    level: INFO # DEBUG if file in handlers  +
+    handlers:   #                            |
+      - console #                            |
+      # - file          <--------------------+
+    propagate: no
