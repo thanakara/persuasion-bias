@@ -1,0 +1,20 @@
+version: 1
+disable_existing_loggers: False
+
+formatters:
+  simple:
+    format: "[%(levelname)s]: %(message)s"
+  error-simple:
+    format : "%(asctime)s - %(name)s - %(lineno)d [%(levelname)s]: %(message)s"
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: simple
+    stream: ext://sys.stdout
+
+loggers:
+  root:
+    level: INFO
+    handlers:
+      - console

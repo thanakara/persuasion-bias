@@ -1,4 +1,5 @@
-from typing import List
+import logging
+from typing import Annotated, List
 
 from langchain.retrievers import ContextualCompressionRetriever
 from langchain.retrievers.document_compressors import (
@@ -34,38 +35,50 @@ class ChainRAGHuggingFace:
 
     def __init__(
         self,
-        model_repo_id: str,
-        embedding_model_repo_id: str,
+        log: logging.Logger,
+        model_repo_id: Annotated[str, "HuggingFace `text-generation` model"],
+        embedding_model_repo_id: Annotated[
+            str, "HuggingFace `feature-extraction` model"
+        ],
         vector_storage: VectorStore = Chroma,
     ) -> None:
+        self.log = log
         self.model_repo_id = model_repo_id
         self.embedding_model_repo_id = embedding_model_repo_id
         self.vector_storage = vector_storage
+        self.embedding = None
+        self.model = None
+        self.tokenizer = None
 
     def _load_models_from_hub(
         self,
     ) -> tuple[HuggingFaceEmbeddings, ChatHuggingFace, AutoTokenizer]:
         """Loads Models and Tokenizer from HuggingFace"""
 
-        embedding = HuggingFaceEmbeddings(
+        if self.embedding and self.model and self.tokenizer:
+            return self.embedding, self.model, self.tokenizer
+
+        self.log.info(msg="Loading models from HuggingFace...")
+        self.embedding = HuggingFaceEmbeddings(
             model=self.embedding_model_repo_id,
-            model_kwargs={"device": "cpu"},  # TODO: FAISS: -supports GPU
+            model_kwargs={"device": "cpu"},  # TODO: FAISS: --supports GPU
             encode_kwargs={"normalize_embeddings": True},
         )
-        endpoint = HuggingFaceEndpoint(
+        llm = HuggingFaceEndpoint(
             repo_id=self.model_repo_id,
             task="text-generation",
             max_new_tokens=512,
             do_sample=False,
             repetition_penalty=1.03,
         )
-        chat_model = ChatHuggingFace(llm=endpoint)
+        self.model = ChatHuggingFace(llm=llm)
 
-        tokenizer = AutoTokenizer.from_pretrained(
+        self.tokenizer = AutoTokenizer.from_pretrained(
             pretrained_model_name_or_path=self.model_repo_id, trust_remote_code=True
         )
+        self.log.info("Success.")
 
-        return (embedding, chat_model, tokenizer)
+        return self.embedding, self.model, self.tokenizer
 
     def _build_prompt(self) -> ChatPromptTemplate:
         """Crete prompts using the model's Tokenizer"""
@@ -84,22 +97,26 @@ class ChainRAGHuggingFace:
 
         return ChatPromptTemplate.from_template(template=template)
 
-    @staticmethod
-    def _load_documents_from_hub() -> List[Document]:
+    def _load_documents_from_hub(self) -> List[Document]:
         """Getting the Anthropic/persuasion dataset using custom class."""
 
         loader = PersuasionDatasetLoader()
+        self.log.info("Loading Persuasion Dataset...")
+        documents = loader.load_from_huggingface()
+        self.log.info(f"Preprocessed and loaded {len(documents)} Documents.")
 
-        return loader.load_from_huggingface()
+        return documents
 
     def _vectorstore_as_retriever(self) -> VectorStoreRetriever:
         """Make the Retriever using preferenced vector store."""
 
         documents = self._load_documents_from_hub()
         embedding, *_ = self._load_models_from_hub()
+        self.log.info("Creating vector store...")
         vectorstore = self.vector_storage.from_documents(
             documents=documents, embedding=embedding
         )
+        self.log.info("Vector store created.")
 
         return vectorstore.as_retriever(search_kwargs={"k": 3})
 
