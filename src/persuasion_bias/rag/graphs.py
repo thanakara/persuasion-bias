@@ -1,31 +1,32 @@
 import json
-from typing import Callable
 
+from collections.abc import Callable
+
+from langgraph.graph import END, StateGraph
 from langchain.retrievers import ContextualCompressionRetriever
-from langchain.retrievers.document_compressors import (
-    DocumentCompressorPipeline,
-    EmbeddingsFilter,
-)
+from langgraph.graph.state import CompiledStateGraph
 from langchain.vectorstores import VectorStore
-from langchain_community.document_transformers import EmbeddingsRedundantFilter
+from langchain_core.prompts import PromptTemplate
+from langchain_core.messages import AIMessage, ToolMessage, SystemMessage
 from langchain_core.documents import Document
+from langchain_core.runnables import RunnableBinding
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
-from langchain_core.prompts import PromptTemplate
-from langchain_core.runnables import RunnableBinding
-from langgraph.graph import END, StateGraph
-from langgraph.graph.state import CompiledStateGraph
+from langchain.retrievers.document_compressors import (
+    EmbeddingsFilter,
+    DocumentCompressorPipeline,
+)
+from langchain_community.document_transformers import EmbeddingsRedundantFilter
 
-from persuasion_bias.core.document_loaders import PersuasionDatasetLoader
-from persuasion_bias.core.retrievers import PersuasivenessRetriever
 from persuasion_bias.core.state import AnalysisState, BaselineState
 from persuasion_bias.utils.prompts import (
     ANALYSIS_PROMPT,
-    IS_ARGUMENT_TEMPLATE,
     RAG_SYSTEM_MESSAGE,
+    IS_ARGUMENT_TEMPLATE,
 )
 from persuasion_bias.utils.wrappers import join_documents
+from persuasion_bias.core.retrievers import PersuasivenessRetriever
+from persuasion_bias.core.document_loaders import PersuasionDatasetLoader
 
 
 class BaselinePersuasionRAG:
@@ -78,16 +79,12 @@ class BaselinePersuasionRAG:
         results = []
         for t in tool_calls:
             if t.get("name") not in self.tools_dict:
-                result = (
-                    "Incorrect Tool Name. Please Retry and Select from Available Tools."
-                )
+                result = "Incorrect Tool Name. Please Retry and Select from Available Tools."
 
             # Llama3.2 models after invocation sometimes return nested dictionaries
             try:
                 assert "properties" in t.get("args")
-                result = self.tools_dict.get(t.get("name"))(
-                    **t.get("args").get("properties")
-                )
+                result = self.tools_dict.get(t.get("name"))(**t.get("args").get("properties"))
             except AssertionError:
                 result = self.tools_dict.get(t.get("name"))(**t.get("args"))
 
@@ -98,9 +95,7 @@ class BaselinePersuasionRAG:
 
 
 class BiasAnalystAgent:
-    def __init__(
-        self, llm: BaseChatModel, embedding: Embeddings, vectorstore: VectorStore
-    ) -> None:
+    def __init__(self, llm: BaseChatModel, embedding: Embeddings, vectorstore: VectorStore) -> None:
         self.llm = llm
         self.embedding = embedding
         self.vectorstore = vectorstore
@@ -132,9 +127,7 @@ class BiasAnalystAgent:
 
         return loader.load_from_huggingface()
 
-    def _get_core_retriever(
-        self, similarity_threshold: float = 0.55
-    ) -> ContextualCompressionRetriever:
+    def _get_core_retriever(self, similarity_threshold: float = 0.55) -> ContextualCompressionRetriever:
         """
         Contextual Compression Retriever using:
             * base_retriever=PersuasivenessRetriever [Custom: `MMR` algorithm]
@@ -143,17 +136,11 @@ class BiasAnalystAgent:
 
         if self._retriever is None:
             documents = self._load_documents_from_hub()
-            vectorstore = self.vectorstore.from_documents(
-                documents=documents, embedding=self.embedding
-            )
+            vectorstore = self.vectorstore.from_documents(documents=documents, embedding=self.embedding)
             vectorstore_retriever = PersuasivenessRetriever(vectorstore=vectorstore)
             redundant_filter = EmbeddingsRedundantFilter(embeddings=self.embedding)
-            relevance_filter = EmbeddingsFilter(
-                embeddings=self.embedding, similarity_threshold=similarity_threshold
-            )
-            compression_pipeline = DocumentCompressorPipeline(
-                transformers=[redundant_filter, relevance_filter]
-            )
+            relevance_filter = EmbeddingsFilter(embeddings=self.embedding, similarity_threshold=similarity_threshold)
+            compression_pipeline = DocumentCompressorPipeline(transformers=[redundant_filter, relevance_filter])
             compression_retriever = ContextualCompressionRetriever(
                 base_compressor=compression_pipeline,
                 base_retriever=vectorstore_retriever,
@@ -170,9 +157,7 @@ class BiasAnalystAgent:
         response = self.llm.invoke(prompt.format(query=query))
 
         response_text = response.content.strip().lower()
-        is_argument = response_text in ["true", "1", "yes"] or response_text.startswith(
-            "true"
-        )
+        is_argument = response_text in ["true", "1", "yes"] or response_text.startswith("true")
         return {"is_argument": is_argument}
 
     @staticmethod
