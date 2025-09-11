@@ -1,8 +1,9 @@
 import operator
+
 from typing import Annotated, TypedDict
 
-from langchain_core.messages import BaseMessage
 from langgraph.graph import MessagesState
+from langchain_core.messages import BaseMessage
 
 from persuasion_bias.utils.outputs import BiasAnalysis
 

@@ -1,10 +1,10 @@
 from functools import wraps
-from typing import Callable
+from collections.abc import Callable
 
 from IPython.display import Markdown, display
-from langchain_core.documents import Document
-from langchain_core.messages import HumanMessage
 from langgraph.graph.state import CompiledStateGraph
+from langchain_core.messages import HumanMessage
+from langchain_core.documents import Document
 
 
 def join_documents(documents: list[Document]) -> str:

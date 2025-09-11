@@ -13,7 +13,7 @@ IS_ARGUMENT_TEMPLATE = """\
         You are an expert in argumentation. Decide if the user's question
         is an argument or not. If yes, return True. If not, return False.
         Return nothing else.
-        
+
         Question: {query}
         """
 
@@ -39,9 +39,9 @@ ANALYSIS_PROMPT = """\
     Analyze the text for:
 
     1. CIALDINI'S PRINCIPLES OF PERSUASION:
-    
+
     - Reciprocity: Creating obligation through gifts/favors
-    - Commitment/Consistency: Getting agreement to maintain consistency  
+    - Commitment/Consistency: Getting agreement to maintain consistency
     - Social Proof: Using others' behavior as validation
     - Authority: Leveraging credibility and expertise
     - Liking: Using attractiveness/similarity to influence
@@ -60,7 +60,7 @@ ANALYSIS_PROMPT = """\
     - Who is being targeted and how
 
     Provide your analysis in the following JSON format:
-    
+
     {{
         "cialdini_principles": [
             {{

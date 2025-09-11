@@ -1,15 +1,14 @@
 import logging
 import threading
-from logging.config import dictConfig
+
 from pathlib import Path
-from typing import Optional, Union
+from logging.config import dictConfig
 
 import yaml
 
 from persuasion_bias.config.path import CONFIG_PATH
 
 
-###
 class SimpleLogger:
     """Custom Logger that can be reconfigured from any YAML file."""
 
@@ -28,7 +27,7 @@ class SimpleLogger:
                     self._configure_logging()
 
     @classmethod
-    def _configure_logging(cls, config_file: Optional[Union[str, Path]] = None) -> None:
+    def _configure_logging(cls, config_file: str | Path | None = None) -> None:
         """Configure logging once at startup."""
 
         config_path = Path(config_file or cls._CONFIG)
@@ -47,9 +46,7 @@ class SimpleLogger:
 
     @staticmethod
     def _setup_default_logging() -> None:
-        logging.basicConfig(
-            level=logging.INFO, format="%(levelname)s:%(name)s: %(message)s"
-        )
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s: %(message)s")
 
     @property
     def logger(self) -> logging.Logger:
@@ -58,7 +55,7 @@ class SimpleLogger:
         return logging.getLogger(name=self.name)
 
     @classmethod
-    def reconfigure_from_file(cls, config_file: Union[str, Path]) -> None:
+    def reconfigure_from_file(cls, config_file: str | Path) -> None:
         """Allow manual configuration with another file."""
 
         with cls._lock:

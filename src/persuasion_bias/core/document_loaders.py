@@ -1,7 +1,8 @@
 import pandas as pd
+
 from datasets import load_dataset
-from langchain_core.document_loaders.base import BaseLoader
 from langchain_core.documents import Document
+from langchain_core.document_loaders.base import BaseLoader
 
 
 class PersuasionDatasetLoader(BaseLoader):

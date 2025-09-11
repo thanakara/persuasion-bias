@@ -1,29 +1,30 @@
 import logging
-from typing import Annotated, List
 
-from langchain.retrievers import ContextualCompressionRetriever
-from langchain.retrievers.document_compressors import (
-    DocumentCompressorPipeline,
-    EmbeddingsFilter,
-)
-from langchain.vectorstores import VectorStore
-from langchain_anthropic import ChatAnthropic
+from typing import Annotated
+
+from transformers import AutoTokenizer
 from langchain_chroma import Chroma
-from langchain_community.document_transformers import EmbeddingsRedundantFilter
-from langchain_core.documents import Document
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnablePassthrough, RunnableSequence
-from langchain_core.vectorstores.base import VectorStoreRetriever
+from langchain_anthropic import ChatAnthropic
+from langchain.retrievers import ContextualCompressionRetriever
 from langchain_huggingface import (
     ChatHuggingFace,
-    HuggingFaceEmbeddings,
     HuggingFaceEndpoint,
+    HuggingFaceEmbeddings,
 )
-from transformers import AutoTokenizer
+from langchain.vectorstores import VectorStore
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.documents import Document
+from langchain_core.runnables import RunnableSequence, RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.vectorstores.base import VectorStoreRetriever
+from langchain.retrievers.document_compressors import (
+    EmbeddingsFilter,
+    DocumentCompressorPipeline,
+)
+from langchain_community.document_transformers import EmbeddingsRedundantFilter
 
-from persuasion_bias.core.document_loaders import PersuasionDatasetLoader
 from persuasion_bias.utils.prompts import RAG_PROMPT
+from persuasion_bias.core.document_loaders import PersuasionDatasetLoader
 
 
 class ChainRAGHuggingFace:
@@ -37,9 +38,7 @@ class ChainRAGHuggingFace:
         self,
         log: logging.Logger,
         model_repo_id: Annotated[str, "HuggingFace `text-generation` model"],
-        embedding_model_repo_id: Annotated[
-            str, "HuggingFace `feature-extraction` model"
-        ],
+        embedding_model_repo_id: Annotated[str, "HuggingFace `feature-extraction` model"],
         vector_storage: VectorStore = Chroma,
     ) -> None:
         self.log = log
@@ -76,8 +75,7 @@ class ChainRAGHuggingFace:
         self.tokenizer = AutoTokenizer.from_pretrained(
             pretrained_model_name_or_path=self.model_repo_id, trust_remote_code=True
         )
-        self.log.info("Success.")
-
+        self.log.info("Models loaded successfully")
         return self.embedding, self.model, self.tokenizer
 
     def _build_prompt(self) -> ChatPromptTemplate:
@@ -97,7 +95,7 @@ class ChainRAGHuggingFace:
 
         return ChatPromptTemplate.from_template(template=template)
 
-    def _load_documents_from_hub(self) -> List[Document]:
+    def _load_documents_from_hub(self) -> list[Document]:
         """Getting the Anthropic/persuasion dataset using custom class."""
 
         loader = PersuasionDatasetLoader()
@@ -113,9 +111,7 @@ class ChainRAGHuggingFace:
         documents = self._load_documents_from_hub()
         embedding, *_ = self._load_models_from_hub()
         self.log.info("Creating vector store...")
-        vectorstore = self.vector_storage.from_documents(
-            documents=documents, embedding=embedding
-        )
+        vectorstore = self.vector_storage.from_documents(documents=documents, embedding=embedding)
         self.log.info("Vector store created.")
 
         return vectorstore.as_retriever(search_kwargs={"k": 3})
@@ -127,13 +123,7 @@ class ChainRAGHuggingFace:
         prompt = self._build_prompt()
         retriever = self._vectorstore_as_retriever()
 
-        runnable = (
-            {"question": RunnablePassthrough(), "documents": retriever}
-            | prompt
-            | llm
-            | StrOutputParser()
-        )
-
+        runnable = {"question": RunnablePassthrough(), "documents": retriever} | prompt | llm | StrOutputParser()
         return runnable
 
 
@@ -153,7 +143,6 @@ class CompressionRAGChain:
         repo_id: str | None = None,
         vectorstore: VectorStore = Chroma,
         use_anthropic: bool = False,
-        documents: List[Document] = [],
         retriever: VectorStoreRetriever = None,
     ) -> None:
         self.log = log
@@ -180,18 +169,15 @@ class CompressionRAGChain:
             raise ValueError(error_msg)
 
         self.vectorstore = vectorstore
-        self._documents = documents
         self._retriever = retriever
 
-    def _load_documents_from_hub(self) -> List[Document]:
+    @staticmethod
+    def _load_documents_from_hub() -> list[Document]:
         """Loads Anthropic/persuasion using custom class."""
 
-        if not self._documents:
-            loader = PersuasionDatasetLoader()
-            documents = loader.load_from_huggingface()
-            self._documents.extend(documents)
-
-        return self._documents
+        loader = PersuasionDatasetLoader()
+        documents = loader.load_from_huggingface()
+        return documents
 
     @staticmethod
     def _load_sentence_transformers_embeddings() -> HuggingFaceEmbeddings:
@@ -217,22 +203,14 @@ class CompressionRAGChain:
             embedding = self._load_sentence_transformers_embeddings()
             documents = self._load_documents_from_hub()
             self.log.debug("Creating vectorstore")
-            vectorstore = self.vectorstore.from_documents(
-                documents=documents, embedding=embedding
-            )
+            vectorstore = self.vectorstore.from_documents(documents=documents, embedding=embedding)
             self.log.debug("Setting up vectorstore retriever")
-            vectorstore_retriever = vectorstore.as_retriever(
-                search_type="mmr", search_kwargs={"k": 5}
-            )
+            vectorstore_retriever = vectorstore.as_retriever(search_type="mmr", search_kwargs={"k": 5})
 
             self.log.debug("Setting up the compression pipeline")
             redundant_filter = EmbeddingsRedundantFilter(embeddings=embedding)
-            relevance_filter = EmbeddingsFilter(
-                embeddings=embedding, similarity_threshold=similarity_threshold
-            )
-            compression_pipeline = DocumentCompressorPipeline(
-                transformers=[redundant_filter, relevance_filter]
-            )
+            relevance_filter = EmbeddingsFilter(embeddings=embedding, similarity_threshold=similarity_threshold)
+            compression_pipeline = DocumentCompressorPipeline(transformers=[redundant_filter, relevance_filter])
             compression_retriever = ContextualCompressionRetriever(
                 base_compressor=compression_pipeline,
                 base_retriever=vectorstore_retriever,
@@ -248,9 +226,7 @@ class CompressionRAGChain:
 
         system_prompt = RAG_PROMPT
 
-        return ChatPromptTemplate.from_messages(
-            [("system", system_prompt), ("human", "{argument}")]
-        )
+        return ChatPromptTemplate.from_messages([("system", system_prompt), ("human", "{argument}")])
 
     def create_runnable_sequence(self) -> RunnableSequence:
         """The full ContextualCompression RAG Chain --no-memory."""
@@ -258,11 +234,6 @@ class CompressionRAGChain:
         prompt = self._create_prompt()
         retriever = self._get_contextual_compression_retriever()
         model = self.model
-        runnable = (
-            {"argument": RunnablePassthrough(), "documents": retriever}
-            | prompt
-            | model
-            | StrOutputParser()
-        )
+        runnable = {"argument": RunnablePassthrough(), "documents": retriever} | prompt | model | StrOutputParser()
 
         return runnable

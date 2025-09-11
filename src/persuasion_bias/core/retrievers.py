@@ -1,20 +1,20 @@
 from typing import override
 
-from langchain_chroma.vectorstores import Chroma
+from pydantic import Field
 from langchain_core.callbacks import CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
-from pydantic import Field
+from langchain_core.vectorstores import VectorStore
 
 
 class PersuasivenessRetriever(BaseRetriever):
     """
     Custom retriever that can filter by persuasiveness and source.
-    Similar to .as_retriever() method using the MMR algorithm.
+    Similar to vectorstore.as_retriever() method using the MMR algorithm.
     """
 
     # BaseRetriever uses Pydantic
-    vectorstore: Chroma = Field(...)
+    vectorstore: VectorStore = Field(...)
 
     @override
     def _get_relevant_documents(

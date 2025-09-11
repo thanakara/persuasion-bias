@@ -32,3 +32,39 @@ build-backend = "uv_build"
 dev = [
     "ruff>=0.12.11",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+exclude = [".git", ".vscode"]
+
+[tool.ruff.lint]
+select = [
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C",    # flake8-comprehensions
+    "E",    # pycodestyle
+    "F",    # Pyflakes
+    "W",    # pycodestyle warnings
+    "B9",   # flake8-bugbear
+    "UP",   # pyupgrade
+    "PL",   # pylint
+    # "G",    # logging
+]
+ignore = [
+    "W191",     # indentation-with-tabs, handled by ruff-format
+    "E731",     # lambda-assignment
+    "B905",     # zip-without-explicit-strict
+    "PLR0913",  # too-many-arguments
+    "PLC0414",  # useless-import-alias
+]
+
+[tool.ruff.lint.isort]
+from-first = false
+length-sort = true
+lines-between-types = 1
+known-first-party = ["src"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
