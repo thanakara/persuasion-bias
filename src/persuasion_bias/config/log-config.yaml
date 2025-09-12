@@ -3,7 +3,7 @@ disable_existing_loggers: false
 
 formatters:
   simple:
-    format: "[%(levelname)s]: %(message)s"
+    format: "[%(levelname)s @%(name)s]: %(message)s"
   file-simple:
     format : "%(asctime)s - %(name)s - [%(levelname)s]: %(message)s"
   error-simple:
@@ -28,7 +28,7 @@ handlers:
     stream: ext://sys.stderr
 
 loggers:
-  persuasion_bias:
+  core:
     level: WARNING
     propagate: yes
 

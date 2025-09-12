@@ -1,5 +1,6 @@
 # Python-generated files
 __pycache__/
+.ipynb_checkpoints
 *.py[oc]
 build/
 dist/
@@ -11,9 +12,6 @@ wheels/
 
 # dotenv
 .env
-
-# Jupyter
-.ipynb_checkpoints
 
 # Ruff
 .ruff_cache/

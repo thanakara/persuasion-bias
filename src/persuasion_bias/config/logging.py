@@ -9,15 +9,14 @@ import yaml
 from persuasion_bias.config.path import CONFIG_PATH
 
 
-class SimpleLogger:
-    """Custom Logger that can be reconfigured from any YAML file."""
+class LogCallback:
+    """Logger Callback that can be reconfigured from any YAML file."""
 
     _configured = False
     _lock = threading.Lock()
     _CONFIG = CONFIG_PATH
 
-    def __init__(self, name: str) -> None:
-        self.name = name
+    def __init__(self) -> None:
         self._ensure_configured()
 
     def _ensure_configured(self) -> None:
@@ -52,7 +51,7 @@ class SimpleLogger:
     def logger(self) -> logging.Logger:
         """Get logger instance - Configuration already done in the constructor."""
 
-        return logging.getLogger(name=self.name)
+        return logging.getLogger(f"{self.__class__.__name__}")
 
     @classmethod
     def reconfigure_from_file(cls, config_file: str | Path) -> None:
