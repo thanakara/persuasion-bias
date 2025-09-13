@@ -268,7 +268,7 @@ class BiasExplanation:
         is_argument = response_text in ["true", "1", "yes"] or response_text.startswith("true")
 
         return GraphState(
-            messages=state.get("messages") + [response.content],
+            messages=state.get("messages") + [AIMessage(content=response.content)],
             is_argument=is_argument,
         )
 
