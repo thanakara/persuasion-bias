@@ -8,7 +8,7 @@ from langchain.retrievers import ContextualCompressionRetriever
 from langgraph.graph.state import CompiledStateGraph
 from langchain.vectorstores import VectorStore
 from langchain_core.prompts import PromptTemplate
-from langchain_core.messages import AIMessage, ToolMessage, SystemMessage
+from langchain_core.messages import AIMessage, ToolMessage, HumanMessage, SystemMessage
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableBinding
 from langchain_core.embeddings import Embeddings
@@ -259,14 +259,18 @@ class BiasExplanation:
     def is_argument_node(self, state: GraphState) -> GraphState:
         """Decides whether to retrieve OR __end__."""
 
-        query = state.get("query")
+        query = state.get("query", "")
         prompt = PromptTemplate.from_template(template=IS_ARGUMENT_TEMPLATE)
-        response = self.llm.invoke(prompt.format(query=query))
+        message = HumanMessage(content=prompt.format(query=query))
+        response = self.llm.invoke(state.get("messages") + [message])
 
         response_text = response.content.strip().lower()
         is_argument = response_text in ["true", "1", "yes"] or response_text.startswith("true")
 
-        return {"is_argument": is_argument, "messages": [AIMessage(content=response.content)]}
+        return GraphState(
+            messages=state.get("messages") + [response.content],
+            is_argument=is_argument,
+        )
 
     @staticmethod
     def should_continue(state: GraphState) -> Literal["true", "false"]:
@@ -284,7 +288,10 @@ class BiasExplanation:
         retrieved_documents = retriever.invoke(query)
         content = f"Retrieved {len(retrieved_documents)} documents from knowledge base"
 
-        return {"messages": [AIMessage(content=content)], "retrieval": join_documents(documents=retrieved_documents)}
+        return GraphState(
+            messages=state.get("messages") + [AIMessage(content=content)],
+            retrieval=join_documents(documents=retrieved_documents),
+        )
 
     def bias_analysis_node(self, state: GraphState) -> GraphState:
         """Gives a bias analysis of the argument."""
@@ -301,7 +308,7 @@ class BiasExplanation:
         except json.JSONDecodeError:
             analysis = response.content
 
-        return {"messages": [message], "analysis": analysis}
+        return GraphState(messages=state.get("messages") + [message], analysis=analysis)
 
     def explanation_node(self, state: GraphState) -> GraphState:
         """Based on analysis final bias explanation."""
@@ -313,4 +320,4 @@ class BiasExplanation:
         explanation = self.llm.invoke(prompt.format(query=query, analysis=analysis))
         message = AIMessage(content="I have generated a bias explanation for you")
 
-        return {"explanation": explanation.content, "messages": [message]}
+        return GraphState(messages=state.get("messages") + [message], explanation=explanation.content)
