@@ -304,7 +304,7 @@ class BiasExplanation:
         message = AIMessage(content="I have completed the analysis")
 
         try:
-            analysis = json.dumps(response.content)
+            analysis = json.loads(response.content)
         except json.JSONDecodeError:
             analysis = response.content
 
