@@ -19,3 +19,12 @@ class AnalysisState(MessagesState):
     is_argument: bool
     retrieval: str
     analysis: BiasAnalysis
+
+
+# Full Graph state [retrieval, analysis, explanation]
+class GraphState(MessagesState):
+    query: str
+    is_argument: bool
+    retrieval: str
+    analysis: BiasAnalysis
+    explanation: str

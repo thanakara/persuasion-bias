@@ -11,8 +11,9 @@ RAG_PROMPT = """\
 
 IS_ARGUMENT_TEMPLATE = """\
         You are an expert in argumentation. Decide if the user's question
-        is an argument or not. If yes, return True. If not, return False.
-        Return nothing else.
+        is an argument or not. IF yes, return True and nothing else.
+        ELSE, respond normally as you would without
+        refering to the user that the question wasn't an argument.
 
         Question: {query}
         """
@@ -27,7 +28,6 @@ RAG_SYSTEM_MESSAGE = """\
     """
 
 
-###
 ANALYSIS_PROMPT = """\
     You are an expert bias detection system.
     Analyze the following text for persuasion techniques and potential biases.
@@ -80,3 +80,23 @@ ANALYSIS_PROMPT = """\
     DO NOT use extra lines on the JSON.
     Follow the format above and NOTHING MORE.
     """
+
+
+EXPLANATORY_PROMPT = """\
+Generate a comprehensive, educational explanation of the bias analysis results.
+
+ARGUMENT: {query}
+
+BIAS ANALYSIS RESULTS: {analysis}
+
+Create an explanation that:
+
+1. Summarizes the overall bias assessment
+2. Explains each detected Cialdini principle with examples
+3. Details any logical fallacies found
+4. Discusses emotional manipulation tactics
+5. Highlights credibility concerns
+
+The explanation should be accessible to general audiences while being
+thorough and educational. Respond in Markdown format.
+"""

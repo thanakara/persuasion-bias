@@ -1,5 +1,6 @@
 import json
 
+from typing import Literal
 from collections.abc import Callable
 
 from langgraph.graph import END, StateGraph
@@ -11,6 +12,7 @@ from langchain_core.messages import AIMessage, ToolMessage, SystemMessage
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableBinding
 from langchain_core.embeddings import Embeddings
+from langgraph.checkpoint.memory import InMemorySaver
 from langchain_core.language_models import BaseChatModel
 from langchain.retrievers.document_compressors import (
     EmbeddingsFilter,
@@ -18,9 +20,10 @@ from langchain.retrievers.document_compressors import (
 )
 from langchain_community.document_transformers import EmbeddingsRedundantFilter
 
-from persuasion_bias.core.state import AnalysisState, BaselineState
+from persuasion_bias.core.state import GraphState, AnalysisState, BaselineState
 from persuasion_bias.utils.prompts import (
     ANALYSIS_PROMPT,
+    EXPLANATORY_PROMPT,
     RAG_SYSTEM_MESSAGE,
     IS_ARGUMENT_TEMPLATE,
 )
@@ -161,7 +164,7 @@ class BiasAnalystAgent:
         return {"is_argument": is_argument}
 
     @staticmethod
-    def should_continue(state: AnalysisState) -> str:
+    def should_continue(state: AnalysisState) -> Literal["true", "false"]:
         """Conditional edge"""
 
         is_argument = state.get("is_argument")
@@ -197,3 +200,117 @@ class BiasAnalystAgent:
             analysis = response.content
 
         return {"messages": [ai_message], "analysis": analysis}
+
+
+class BiasExplanation:
+    def __init__(self, llm: BaseChatModel, embedding: Embeddings, vectorstore: VectorStore) -> None:
+        self.llm = llm
+        self.embedding = embedding
+        self.vectorstore = vectorstore
+        # CACHE:
+        self._retriever = None
+        self._documents = None
+
+    def graph_fabricate(self) -> CompiledStateGraph:
+        workflow = StateGraph(GraphState)
+        workflow.add_node("is_argument", self.is_argument_node)
+        workflow.add_node("retrieve", self.retrieval_node)
+        workflow.add_node("analyze", self.bias_analysis_node)
+        workflow.add_node("explain", self.explanation_node)
+
+        workflow.add_conditional_edges(
+            source="is_argument", path=self.should_continue, path_map={"true": "retrieve", "false": END}
+        )
+        workflow.add_edge("retrieve", "analyze")
+        workflow.add_edge("analyze", "explain")
+        workflow.set_entry_point("is_argument")
+        workflow.set_finish_point("explain")
+
+        return workflow.compile(checkpointer=InMemorySaver())
+
+    def _load_documents_from_hub(self) -> list[Document]:
+        """
+        Loads the Anthropic/persuasion Dataset from HuggingFace;
+        preprocess it and returns a list of Documents. Caches
+        """
+        if self._documents is None:
+            loader = PersuasionDatasetLoader()
+            self._documents = loader.load_from_huggingface()
+
+        return self._documents
+
+    def get_core_retriever(self, similarity_threshold: float = 0.55) -> ContextualCompressionRetriever:
+        """Builds the Contextual Compression Retriever. Caches"""
+
+        if self._retriever is None:
+            documents = self._load_documents_from_hub()
+            vectorstore = self.vectorstore.from_documents(documents=documents, embedding=self.embedding)
+            vectorstore_retriever = PersuasivenessRetriever(vectorstore=vectorstore)
+            redundant_filter = EmbeddingsRedundantFilter(embeddings=self.embedding)
+            relevance_filter = EmbeddingsFilter(embeddings=self.embedding, similarity_threshold=similarity_threshold)
+            compression_pipeline = DocumentCompressorPipeline(transformers=[redundant_filter, relevance_filter])
+            compression_retriever = ContextualCompressionRetriever(
+                base_compressor=compression_pipeline, base_retriever=vectorstore_retriever
+            )
+            self._retriever = compression_retriever
+
+        return self._retriever
+
+    def is_argument_node(self, state: GraphState) -> GraphState:
+        """Decides whether to retrieve OR __end__."""
+
+        query = state.get("query")
+        prompt = PromptTemplate.from_template(template=IS_ARGUMENT_TEMPLATE)
+        response = self.llm.invoke(prompt.format(query=query))
+
+        response_text = response.content.strip().lower()
+        is_argument = response_text in ["true", "1", "yes"] or response_text.startswith("true")
+
+        return {"is_argument": is_argument, "messages": [AIMessage(content=response.content)]}
+
+    @staticmethod
+    def should_continue(state: GraphState) -> Literal["true", "false"]:
+        """Conditional edge"""
+
+        is_argument = state.get("is_argument")
+
+        return "true" if is_argument else "false"
+
+    def retrieval_node(self, state: GraphState) -> GraphState:
+        """Updates the state with retrieval from knowledge base."""
+
+        query = state.get("query")
+        retriever = self.get_core_retriever()
+        retrieved_documents = retriever.invoke(query)
+        content = f"Retrieved {len(retrieved_documents)} documents from knowledge base"
+
+        return {"messages": [AIMessage(content=content)], "retrieval": join_documents(documents=retrieved_documents)}
+
+    def bias_analysis_node(self, state: GraphState) -> GraphState:
+        """Gives a bias analysis of the argument."""
+
+        query = state.get("query")
+        context = state.get("retrieval")
+        prompt = PromptTemplate.from_template(template=ANALYSIS_PROMPT)
+
+        response = self.llm.invoke(prompt.format(query=query, context=context))
+        message = AIMessage(content="I have completed the analysis")
+
+        try:
+            analysis = json.dumps(response.content)
+        except json.JSONDecodeError:
+            analysis = response.content
+
+        return {"messages": [message], "analysis": analysis}
+
+    def explanation_node(self, state: GraphState) -> GraphState:
+        """Based on analysis final bias explanation."""
+
+        query = state.get("query")
+        analysis = state.get("analysis")
+        prompt = PromptTemplate.from_template(template=EXPLANATORY_PROMPT)
+
+        explanation = self.llm.invoke(prompt.format(query=query, analysis=analysis))
+        message = AIMessage(content="I have generated a bias explanation for you")
+
+        return {"explanation": explanation.content, "messages": [message]}
