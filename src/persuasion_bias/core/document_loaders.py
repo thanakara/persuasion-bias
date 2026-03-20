@@ -1,3 +1,5 @@
+from ast import literal_eval
+
 import pandas as pd
 
 from datasets import load_dataset
@@ -49,7 +51,7 @@ class PersuasionDatasetLoader(BaseLoader):
     @staticmethod
     def _deduplicate_frame_by_argument(frame: pd.DataFrame) -> pd.DataFrame:
         for column in ("rating_initial", "rating_final"):
-            frame[column] = frame[column].apply(lambda e: eval(e[0]))
+            frame[column] = frame[column].apply(lambda e: literal_eval(e[0]))
 
         frame.prompt_type = frame.prompt_type.fillna("Other")
         idx_unique = frame.argument.drop_duplicates().index
