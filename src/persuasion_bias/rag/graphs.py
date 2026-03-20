@@ -1,3 +1,4 @@
+from functools import cached_property
 import json
 import logging
 
@@ -70,8 +71,7 @@ class BaselinePersuasionRAG:
         """Invokes the LLM to get a response, adding it to the state."""
 
         messages = state.get("messages")
-        content = RAG_SYSTEM_MESSAGE
-        system_message = SystemMessage(content=content)
+        system_message = SystemMessage(content=RAG_SYSTEM_MESSAGE)
         messages_add = [system_message] + messages
         response = self.llm.invoke(messages_add)
 
@@ -101,126 +101,32 @@ class BaselinePersuasionRAG:
         return {"messages": results}
 
 
-class BiasAnalystAgent:
-    def __init__(self, llm: BaseChatModel, embedding: Embeddings, vectorstore: VectorStore) -> None:
-        self.llm = llm
-        self.embedding = embedding
-        self.vectorstore = vectorstore
-        self._retriever = None
-
-    def _graph_fabricate(self) -> CompiledStateGraph:
-        """Builds the LangGraph workflow."""
-
-        graph = StateGraph(AnalysisState)
-        graph.add_node("is_argument", self.is_argument_node)
-        graph.add_node("retrieve", self.retriever_node)
-        graph.add_node("analyze", self.bias_analyzer_node)
-        graph.add_conditional_edges(
-            "is_argument",
-            self.should_continue,
-            path_map={"true": "retrieve", "false": END},
-        )
-        graph.add_edge("retrieve", "analyze")
-        graph.set_entry_point("is_argument")
-        graph.set_finish_point("analyze")
-
-        return graph.compile()
-
-    @staticmethod
-    def _load_documents_from_hub() -> list[Document]:
-        """Getting the Anthropic/persuasion dataset using custom class."""
-
-        loader = PersuasionDatasetLoader()
-
-        return loader.load_from_huggingface()
-
-    def _get_core_retriever(self, similarity_threshold: float = 0.55) -> ContextualCompressionRetriever:
-        """
-        Contextual Compression Retriever using:
-            * base_retriever=PersuasivenessRetriever [Custom: `MMR` algorithm]
-            * base_compressor=DocumentCompressorPipeline [redundancy -> relevance]
-        """
-
-        if self._retriever is None:
-            documents = self._load_documents_from_hub()
-            vectorstore = self.vectorstore.from_documents(documents=documents, embedding=self.embedding)
-            vectorstore_retriever = PersuasivenessRetriever(vectorstore=vectorstore)
-            redundant_filter = EmbeddingsRedundantFilter(embeddings=self.embedding)
-            relevance_filter = EmbeddingsFilter(embeddings=self.embedding, similarity_threshold=similarity_threshold)
-            compression_pipeline = DocumentCompressorPipeline(transformers=[redundant_filter, relevance_filter])
-            compression_retriever = ContextualCompressionRetriever(
-                base_compressor=compression_pipeline,
-                base_retriever=vectorstore_retriever,
-            )
-            self._retriever = compression_retriever
-
-        return self._retriever
-
-    def is_argument_node(self, state: AnalysisState) -> AnalysisState:
-        """Decides whether to retrieve OR end."""
-
-        query = state.get("query")
-        prompt = PromptTemplate.from_template(template=IS_ARGUMENT_TEMPLATE)
-        response = self.llm.invoke(prompt.format(query=query))
-
-        response_text = response.content.strip().lower()
-        is_argument = response_text in ["true", "1", "yes"] or response_text.startswith("true")
-        return {"is_argument": is_argument}
-
-    @staticmethod
-    def should_continue(state: AnalysisState) -> Literal["true", "false"]:
-        """Conditional edge"""
-
-        is_argument = state.get("is_argument")
-
-        return "true" if is_argument else "false"
-
-    def retriever_node(self, state: AnalysisState) -> AnalysisState:
-        """Updates the state with the retrieval."""
-
-        query = state.get("query")
-        retriever = self._get_core_retriever()
-        documents = retriever.invoke(query)
-
-        content = f"Retrieved {len(documents)} documents from knowledge base."
-        return {
-            "messages": [AIMessage(content=content)],
-            "retrieval": join_documents(documents=documents),
-        }
-
-    def bias_analyzer_node(self, state: AnalysisState) -> AnalysisState:
-        """Analyzes the bias of the argument."""
-
-        query = state.get("query")
-        context = state.get("retrieval")
-        prompt = PromptTemplate.from_template(template=ANALYSIS_PROMPT)
-
-        response = self.llm.invoke(prompt.format(query=query, context=context))
-        ai_message = AIMessage("Bias analysis completed.")
-
-        try:
-            raw = json.loads(response.content)
-            analysis = BiasAnalysis.model_validate(raw)
-        except json.JSONDecodeError:
-            logging.getLogger(__name__).error("LLM returned non-JSON response for bias analysis.")
-            raise
-        except ValidationError as exc:
-            logging.getLogger(__name__).error("BiasAnalysis validation failed: %s", exc)
-            raise
-
-        return {"messages": [ai_message], "analysis": analysis}
-
-
 class BiasExplanation:
     def __init__(self, llm: BaseChatModel, embedding: Embeddings, vectorstore: VectorStore) -> None:
         self.llm = llm
         self.embedding = embedding
         self.vectorstore = vectorstore
-        # CACHE:
-        self._retriever = None
-        self._documents = None
+        self.similarity_threshold: float = 0.55
 
-    def graph_fabricate(self) -> CompiledStateGraph:
+    @cached_property
+    def hub_documents(self) -> list[Document]:
+        loader = PersuasionDatasetLoader()
+        return loader.load_from_huggingface()
+
+    @cached_property
+    def core_retriever(self) -> ContextualCompressionRetriever:
+        documents = self.hub_documents
+        vectorstore = self.vectorstore.from_documents(documents=documents, embedding=self.embedding)
+        vectorstore_retriever = PersuasivenessRetriever(vectorstore=vectorstore)
+        redundant_filter = EmbeddingsRedundantFilter(embeddings=self.embedding)
+        relevance_filter = EmbeddingsFilter(embeddings=self.embedding, similarity_threshold=self.similarity_threshold)
+        compression_pipeline = DocumentCompressorPipeline(transformers=[redundant_filter, relevance_filter])
+
+        return ContextualCompressionRetriever(
+            base_compressor=compression_pipeline, base_retriever=vectorstore_retriever
+        )
+
+    def fabricate_graph(self) -> CompiledStateGraph:
         workflow = StateGraph(GraphState)
         workflow.add_node("is_argument", self.is_argument_node)
         workflow.add_node("retrieve", self.retrieval_node)
@@ -236,34 +142,6 @@ class BiasExplanation:
         workflow.set_finish_point("explain")
 
         return workflow.compile(checkpointer=InMemorySaver())
-
-    def _load_documents_from_hub(self) -> list[Document]:
-        """
-        Loads the Anthropic/persuasion Dataset from HuggingFace;
-        preprocess it and returns a list of Documents. Caches
-        """
-        if self._documents is None:
-            loader = PersuasionDatasetLoader()
-            self._documents = loader.load_from_huggingface()
-
-        return self._documents
-
-    def get_core_retriever(self, similarity_threshold: float = 0.55) -> ContextualCompressionRetriever:
-        """Builds the Contextual Compression Retriever. Caches"""
-
-        if self._retriever is None:
-            documents = self._load_documents_from_hub()
-            vectorstore = self.vectorstore.from_documents(documents=documents, embedding=self.embedding)
-            vectorstore_retriever = PersuasivenessRetriever(vectorstore=vectorstore)
-            redundant_filter = EmbeddingsRedundantFilter(embeddings=self.embedding)
-            relevance_filter = EmbeddingsFilter(embeddings=self.embedding, similarity_threshold=similarity_threshold)
-            compression_pipeline = DocumentCompressorPipeline(transformers=[redundant_filter, relevance_filter])
-            compression_retriever = ContextualCompressionRetriever(
-                base_compressor=compression_pipeline, base_retriever=vectorstore_retriever
-            )
-            self._retriever = compression_retriever
-
-        return self._retriever
 
     def is_argument_node(self, state: GraphState) -> GraphState:
         """Decides whether to retrieve OR __end__."""
@@ -293,7 +171,7 @@ class BiasExplanation:
         """Updates the state with retrieval from knowledge base."""
 
         query = state.get("query")
-        retriever = self.get_core_retriever()
+        retriever = self.core_retriever
         retrieved_documents = retriever.invoke(query)
         content = f"Retrieved {len(retrieved_documents)} documents from knowledge base"
 
