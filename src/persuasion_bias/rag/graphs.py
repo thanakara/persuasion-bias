@@ -1,7 +1,10 @@
 import json
+import logging
 
 from typing import Literal
 from collections.abc import Callable
+
+from pydantic import ValidationError
 
 from langgraph.graph import END, StateGraph
 from langchain.retrievers import ContextualCompressionRetriever
@@ -21,6 +24,7 @@ from langchain.retrievers.document_compressors import (
 from langchain_community.document_transformers import EmbeddingsRedundantFilter
 
 from persuasion_bias.core.state import GraphState, AnalysisState, BaselineState
+from persuasion_bias.utils.outputs import BiasAnalysis
 from persuasion_bias.utils.prompts import (
     ANALYSIS_PROMPT,
     EXPLANATORY_PROMPT,
@@ -195,9 +199,14 @@ class BiasAnalystAgent:
         ai_message = AIMessage("Bias analysis completed.")
 
         try:
-            analysis = json.loads(response.content)
+            raw = json.loads(response.content)
+            analysis = BiasAnalysis.model_validate(raw)
         except json.JSONDecodeError:
-            analysis = response.content
+            logging.getLogger(__name__).error("LLM returned non-JSON response for bias analysis.")
+            raise
+        except ValidationError as exc:
+            logging.getLogger(__name__).error("BiasAnalysis validation failed: %s", exc)
+            raise
 
         return {"messages": [ai_message], "analysis": analysis}
 
@@ -304,9 +313,14 @@ class BiasExplanation:
         message = AIMessage(content="I have completed the analysis")
 
         try:
-            analysis = json.loads(response.content)
+            raw = json.loads(response.content)
+            analysis = BiasAnalysis.model_validate(raw)
         except json.JSONDecodeError:
-            analysis = response.content
+            logging.getLogger(__name__).error("LLM returned non-JSON response for bias analysis.")
+            raise
+        except ValidationError as exc:
+            logging.getLogger(__name__).error("BiasAnalysis validation failed: %s", exc)
+            raise
 
         return GraphState(messages=state.get("messages") + [message], analysis=analysis)
 

@@ -62,12 +62,12 @@ ANALYSIS_PROMPT = """\
     Provide your analysis in the following JSON format:
 
     {{
-        "cialdini_principles": [
+        "detected_principles": [
             {{
                 "principle": "principle_name",
                 "confidence": 0.0-1.0,
                 "evidence": "specific evidence from text",
-                "severity": "low|medium|high"
+                "severity": "low|mid|high"
             }}
         ],
         "logical_fallacies": ["fallacy1", "fallacy2"],
