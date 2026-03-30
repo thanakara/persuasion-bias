@@ -20,6 +20,10 @@ class BiasDetection(BaseModel):
     evidence: str = Field(default="")
 
 
+class ArgumentClassification(BaseModel):
+    is_argument: bool
+
+
 class BiasAnalysis(BaseModel):
     detected_principles: list[BiasDetection]
     overall_bias_score: float = Field(..., gt=0, le=1)

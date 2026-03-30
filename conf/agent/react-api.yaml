@@ -1,0 +1,5 @@
+_target_: persuasion_bias.agents.agent.ReActAPI
+llm: ${llm}
+prompts:
+  system: ${prompt:${system_prompt}}
+memory: ${oc.select:memory, true}

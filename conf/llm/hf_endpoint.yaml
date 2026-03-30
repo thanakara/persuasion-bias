@@ -1,0 +1,9 @@
+_target_: langchain_huggingface.ChatHuggingFace
+llm:
+  _target_: langchain_huggingface.HuggingFaceEndpoint
+  repo_id: meta-llama/Llama-3.1-8B-Instruct
+  provider: cerebras
+  task: text-generation
+  max_new_tokens: 512
+  temperature: ${oc.select:temperature, 0.6}
+  huggingfacehub_api_token: ${oc.env:HF_TOKEN,""}

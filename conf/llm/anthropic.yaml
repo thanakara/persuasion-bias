@@ -1,0 +1,5 @@
+_target_: langchain_anthropic.ChatAnthropic
+model: ${oc.select:model, claude-haiku-4-5-20251001}
+temperature: ${oc.select:temperature, 0.6}
+max_tokens: 1024
+anthropic_api_key: ${oc.env:ANTHROPIC_API_KEY,""}
