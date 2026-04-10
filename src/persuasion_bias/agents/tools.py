@@ -1,18 +1,12 @@
 from logging import getLogger
 from datetime import datetime
 
-from pydantic import BaseModel
 from langchain.tools import BaseTool, tool
 from langchain_tavily import TavilySearch
 
 from persuasion_bias.retrieval.utils import join_documents
 
 logger = getLogger(__name__)
-
-
-class MultiplyInput(BaseModel):
-    a: float
-    b: float
 
 
 @tool(
