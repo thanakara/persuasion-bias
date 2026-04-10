@@ -1,0 +1,15 @@
+defaults:
+  - hydra: settings
+  - agent: react
+  - llm: vllm
+  - loader: persuasion
+  - embedding: sentence_transformers
+  - vectorstore: chroma
+  - _self_
+
+system_prompt: RAG_PROMPT
+
+retriever:
+  search_type: similarity
+  search_kwargs:
+    k: 4

@@ -1,0 +1,6 @@
+_target_: langchain_huggingface.HuggingFaceEmbeddings
+model_name: sentence-transformers/all-MiniLM-L6-v2
+model_kwargs:
+  device: ${decide_device:}
+encode_kwargs:
+  normalize_embeddings: true

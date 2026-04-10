@@ -1,0 +1,3 @@
+_target_: persuasion_bias.retrieval.vectorstore.build_chroma
+persist_directory: .cache/chroma
+collection_name: ${hydra:runtime.choices.loader}_${hydra:runtime.choices.embedding}
