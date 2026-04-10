@@ -3,6 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 from langchain.tools import BaseTool, tool
+from langchain_tavily import TavilySearch
 
 from persuasion_bias.retrieval.utils import join_documents
 
@@ -26,16 +27,8 @@ def get_time() -> str:
     return datetime.now().strftime("%A %d-%b-%y %I:%M%p")
 
 
-@tool(
-    "multiply_numbers",
-    description=(
-        "Use this tool to multiply two numbers `a` and `b`. "
-        "Always use this tool for multiplication, never compute it yourself. "
-    ),
-    args_schema=MultiplyInput,
-)
-def multiply_numbers(a: float, b: float) -> float:
-    return a * b
+def get_tavily_tool() -> BaseTool:
+    return TavilySearch(max_results=2)
 
 
 def make_retrieve_tool(retriever) -> BaseTool:

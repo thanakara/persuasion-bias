@@ -20,6 +20,7 @@ dependencies = [
     "langchain-core>=1.2.20",
     "langchain-huggingface>=1.2.0",
     "langchain-openai>=1.1.10",
+    "langchain-tavily>=0.2.17",
     "langgraph>=1.0.0",
     "pandas>=2.3.2",
     "sentence-transformers>=5.1.0",

@@ -1,4 +1,4 @@
-from .tools import get_time, multiply_numbers, make_retrieve_tool
+from .tools import get_time, get_tavily_tool, make_retrieve_tool
 
 
 def make_tools(**kwargs):
@@ -6,7 +6,7 @@ def make_tools(**kwargs):
         raise ValueError("Need retriever to create tools")
 
     return [
-        multiply_numbers,
         get_time,
+        get_tavily_tool(),
         make_retrieve_tool(retriever),
     ]
