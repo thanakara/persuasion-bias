@@ -5,9 +5,8 @@ permissions:
 
 on:
     push:
-        branches:
-            - "ci/*"
-            - "ci-*"
+        branches-ignore:
+            - main
     pull_request:
         branches:
             - main
