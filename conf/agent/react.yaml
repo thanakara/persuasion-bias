@@ -1,0 +1,4 @@
+_target_: persuasion_bias.agents.react.ReActChain
+llm: ${llm}
+prompts:
+  system: ${prompt:${system_prompt}}
