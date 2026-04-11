@@ -17,9 +17,17 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
             - uses: ./.github/actions/uv_setup
-
             - name: make all
               run: |
                   make lint
+    test_job:
+        name: test job
+        runs-on: ubuntu-latest
+        needs: lint_job
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+            - uses: ./.github/actions/uv_setup
+            - name: test
+              run: |
+                  make test
