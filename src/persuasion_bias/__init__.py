@@ -1,5 +1,3 @@
-import readline  # noqa: F401
-
 from persuasion_bias.utils import Turn
 
 

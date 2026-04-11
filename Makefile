@@ -1,6 +1,6 @@
 .DEFAULT_GOAL: help
 
-.PHONY: help lint format all
+.PHONY: help lint format test all
 
 FILES ?= src/persuasion_bias
 
@@ -8,9 +8,11 @@ help:
 	@echo ""
 	@echo "--- LINTING ---"
 	@echo "lint"
-	@echo "lint FILES=<files-to-lint>"
+	@echo "lint FILES=..."
 	@echo "format"
-	@echo "format FILES=<files-to-format>"
+	@echo "format FILES=..."
+	@echo "--- TESTING ---"
+	@echo "test"
 	@echo ""
 
 lint lint_diff:
@@ -21,4 +23,7 @@ format format_diff:
 	@uv run ruff format $(FILES)
 	@uv run ruff check --fix $(FILES)
 
-all: lint format
+test:
+	@uv run pytest tests/ --no-header -v
+
+all: lint format test
