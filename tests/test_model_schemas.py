@@ -54,7 +54,12 @@ def test_argument_classification_missing_field():
 @pytest.fixture
 def valid_bias_analysis():
     return {
-        "detected_principles": [BiasDetection(principle=CialdiniPrinciple.AUTHORITY, severity="high")],
+        "detected_principles": [
+            BiasDetection(
+                principle=CialdiniPrinciple.AUTHORITY,
+                severity="high",
+            )
+        ],
         "overall_bias_score": 0.8,
         "emotional_manipulation_score": 0.5,
         "target_audience_analysis": "Targets young professionals",
