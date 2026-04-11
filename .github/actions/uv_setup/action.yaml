@@ -18,4 +18,4 @@ runs:
     - name: install dependencies
       if: steps.venv-cache.outputs.cache-hit != 'true'
       shell: bash
-      run: uv sync --frozen --only-dev
+      run: uv sync --frozen # removed: --only-dev
